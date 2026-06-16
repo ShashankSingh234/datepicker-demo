@@ -39,7 +39,7 @@
       margin-bottom: 0.375rem;
     }
 
-    /* Native input — Desktop only */
+    /* ── Native date input (Desktop) ── */
     input[type="date"] {
       width: 100%;
       padding: 0.6rem 0.75rem;
@@ -63,7 +63,7 @@
       cursor: not-allowed;
     }
 
-    /* Fake input — iOS & Android */
+    /* ── Fake input shown on mobile (iOS + Android) ── */
     .mobile-date-display {
       width: 100%;
       padding: 0.6rem 0.75rem;
@@ -133,7 +133,7 @@
       margin-bottom: 1rem;
     }
 
-    /* ── Wheel Picker Sheet ── */
+    /* ── Wheel Picker Overlay (slides up from bottom like keyboard) ── */
     .picker-overlay {
       display: none;
       position: fixed;
@@ -157,6 +157,7 @@
       to   { transform: translateY(0); }
     }
 
+    /* ── Toolbar with Cancel / Title / Done ── */
     .picker-toolbar {
       display: flex;
       align-items: center;
@@ -179,6 +180,7 @@
     .btn-done   { color: #007aff; font-weight: 600; }
     .picker-toolbar-title { font-size: 0.9375rem; font-weight: 600; color: #111; }
 
+    /* ── Three scroll wheels (Day / Month / Year) ── */
     .picker-wheels {
       display: flex;
       height: 216px;
@@ -187,7 +189,7 @@
       position: relative;
     }
 
-    /* Selection highlight lines */
+    /* Horizontal lines above and below the selected item */
     .picker-wheels::before,
     .picker-wheels::after {
       content: '';
@@ -201,7 +203,7 @@
     .picker-wheels::before { top: calc(50% - 18px); }
     .picker-wheels::after  { top: calc(50% + 18px); }
 
-    /* Fade top & bottom */
+    /* Fade gradient so items appear to fade into the background */
     .picker-wheels .fade-top,
     .picker-wheels .fade-bottom {
       position: absolute;
@@ -219,15 +221,17 @@
       background: linear-gradient(to top, #f2f2f7 0%, transparent 100%);
     }
 
+    /* Each individual scroll column */
     .picker-wheel {
       flex: 1;
       overflow-y: scroll;
-      scroll-snap-type: y mandatory;
+      scroll-snap-type: y mandatory;   /* snaps to each item */
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
     }
     .picker-wheel::-webkit-scrollbar { display: none; }
 
+    /* Top & bottom padding makes first/last items centerable */
     .picker-wheel-inner { padding: 80px 0; }
 
     .picker-wheel-item {
@@ -240,7 +244,7 @@
       color: #111;
     }
 
-    /* Column labels */
+    /* Column header labels below the wheels */
     .picker-labels {
       display: flex;
       padding: 0 0.5rem 0.5rem;
@@ -264,20 +268,26 @@
   <p class="subtitle">Adapts to your device automatically.</p>
   <div class="device-badge" id="deviceBadge">Detecting device...</div>
 
-  <!-- SINGLE DATE -->
+  <!-- ── Single date picker ── -->
   <div class="field">
     <label>Pick a date <span class="badge">dynamic range</span></label>
+
+    <!-- Shown on Desktop: native browser date input -->
     <input type="date" id="singleDate" style="display:none" />
+
+    <!-- Shown on iOS + Android: tappable div that opens wheel picker -->
     <div class="mobile-date-display" id="singleDisplay" style="display:none"
          onclick="openPicker('single')">
       <span id="singleDisplayText" class="placeholder">Select date</span>
       <span class="arrow">▼</span>
     </div>
+
     <p class="hint">Allowed: last 30 days → 1 year from today</p>
   </div>
 
   <hr class="divider" />
 
+  <!-- ── Linked start / end range ── -->
   <p style="font-size:0.8125rem;font-weight:500;color:#444;margin-bottom:0.75rem;">
     Start &amp; End range <span class="badge">linked</span>
   </p>
@@ -295,6 +305,7 @@
     </div>
     <div class="field">
       <label>End date</label>
+      <!-- End date starts disabled; unlocks after start is chosen -->
       <input type="date" id="endDate" disabled style="display:none" />
       <div class="mobile-date-display disabled" id="endDisplay" style="display:none"
            onclick="openPicker('end')">
@@ -305,6 +316,7 @@
     </div>
   </div>
 
+  <!-- Result summary shown after both start and end are picked -->
   <div id="result-panel">
     <div class="row"><span>Start</span><span id="r-start">—</span></div>
     <div class="row"><span>End</span><span id="r-end">—</span></div>
@@ -312,7 +324,7 @@
   </div>
 </div>
 
-<!-- Wheel Picker Sheet (iOS & Android) -->
+<!-- ── Wheel Picker Bottom Sheet (iOS + Android only) ── -->
 <div class="picker-overlay" id="pickerOverlay" onclick="handleOverlayClick(event)">
   <div class="picker-sheet">
     <div class="picker-toolbar">
@@ -323,12 +335,15 @@
     <div class="picker-wheels">
       <div class="fade-top"></div>
       <div class="fade-bottom"></div>
+      <!-- Day column -->
       <div class="picker-wheel" id="wheelDay">
         <div class="picker-wheel-inner" id="wheelDayInner"></div>
       </div>
+      <!-- Month column -->
       <div class="picker-wheel" id="wheelMonth">
         <div class="picker-wheel-inner" id="wheelMonthInner"></div>
       </div>
+      <!-- Year column -->
       <div class="picker-wheel" id="wheelYear">
         <div class="picker-wheel-inner" id="wheelYearInner"></div>
       </div>
@@ -340,211 +355,367 @@
 </div>
 
 <script>
-// ─── Utilities ────────────────────────────────────────────────
-function fmt(d)        { return d.toISOString().split("T")[0]; }
-function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
-function addYears(d,n) { const r = new Date(d); r.setFullYear(r.getFullYear() + n); return r; }
+  // ─────────────────────────────────────────────────────────────
+  // UTILITY FUNCTIONS
+  // ─────────────────────────────────────────────────────────────
 
-function friendly(str) {
-  if (!str) return null;
-  return new Date(str + "T00:00:00").toLocaleDateString(undefined, {
-    day: "numeric", month: "short", year: "numeric"
+  /**
+   * Format a Date object as "YYYY-MM-DD" using LOCAL date parts.
+   * IMPORTANT: Do NOT use toISOString() here — it converts to UTC
+   * which shifts the date back by 1 day for timezones ahead of UTC
+   * (e.g. India is UTC+5:30, so midnight local = previous day in UTC).
+   */
+  function fmt(d) {
+    const y   = d.getFullYear();
+    const m   = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  /** Add n days to a date (returns new Date, does not mutate) */
+  function addDays(d, n) {
+    const r = new Date(d);
+    r.setDate(r.getDate() + n);
+    return r;
+  }
+
+  /** Add n years to a date (returns new Date, does not mutate) */
+  function addYears(d, n) {
+    const r = new Date(d);
+    r.setFullYear(r.getFullYear() + n);
+    return r;
+  }
+
+  /**
+   * Convert "YYYY-MM-DD" string to a human-readable label like "16 Jun 2026".
+   * Parse with new Date(y, m-1, d) — NOT new Date(str) — to avoid UTC shift.
+   */
+  function friendly(str) {
+    if (!str) return null;
+    const [y, m, d] = str.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString(undefined, {
+      day: "numeric", month: "short", year: "numeric"
+    });
+  }
+
+  /**
+   * Debounce: delays fn execution until delay ms after last call.
+   * Used so the day wheel only rebuilds after the user stops scrolling
+   * month/year (not on every pixel of scroll).
+   */
+  function debounce(fn, delay) {
+    let t;
+    return function () { clearTimeout(t); t = setTimeout(fn, delay); };
+  }
+
+  const MONTHS = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
+
+  // ─────────────────────────────────────────────────────────────
+  // DEVICE DETECTION
+  // ─────────────────────────────────────────────────────────────
+
+  /**
+   * ==============================================================
+   * CHANGE THIS LINE to control which devices use the wheel picker.
+   *
+   * Current: iOS + Android both get wheel picker
+   *   const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) && !window.MSStream;
+   *
+   * For iOS wheel only + Android default:
+   *   const isMobile = /iPad|iPhone|iPod/i.test(navigator.userAgent) && !window.MSStream;
+   *   (Remove "Android" from the regex — see notes at bottom of file)
+   * ==============================================================
+   */
+  const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) && !window.MSStream;
+
+  // Show a label in the UI so you can verify detection while testing
+  const ua = navigator.userAgent;
+  document.getElementById("deviceBadge").textContent =
+    /iPad|iPhone|iPod/i.test(ua) ? "iOS — Wheel picker"     :
+    /Android/i.test(ua)          ? "Android — Wheel picker" :
+                                   "Desktop — Browser picker";
+
+  // ─────────────────────────────────────────────────────────────
+  // DATE RANGES (calculated from today)
+  // ─────────────────────────────────────────────────────────────
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // normalize to midnight so comparisons are date-only
+
+  const ranges = {
+    single: { min: addDays(today, -30),  max: addYears(today, 1) }, // last 30 days → +1 year
+    start:  { min: today,                max: addYears(today, 1) }, // today → +1 year
+    end:    { min: null, max: null }  // set dynamically when start is chosen
+  };
+
+  // ─────────────────────────────────────────────────────────────
+  // SELECTED VALUES STATE
+  // ─────────────────────────────────────────────────────────────
+
+  // Holds the currently selected "YYYY-MM-DD" string for each picker.
+  // Pre-filled with today so pickers open on today by default.
+  const values = { single: fmt(today), start: fmt(today), end: "" };
+
+  // ─────────────────────────────────────────────────────────────
+  // SHOW CORRECT INPUT PER DEVICE
+  // ─────────────────────────────────────────────────────────────
+
+  // Each field has two elements in the HTML:
+  //   - <input type="date">      → shown on Desktop
+  //   - <div .mobile-date-display> → shown on iOS + Android
+  // Only one is visible at a time based on isMobile.
+  ["single", "start", "end"].forEach(key => {
+    const nativeId  = key === "single" ? "singleDate"    : key + "Date";
+    const displayId = key === "single" ? "singleDisplay" : key + "Display";
+    document.getElementById(displayId).style.display = isMobile ? "flex"  : "none";
+    document.getElementById(nativeId).style.display  = isMobile ? "none"  : "block";
   });
-}
 
-const MONTHS = ["January","February","March","April","May","June",
-                "July","August","September","October","November","December"];
+  // ─────────────────────────────────────────────────────────────
+  // NATIVE INPUT SETUP — Desktop only
+  // ─────────────────────────────────────────────────────────────
 
-// ─── Device Detection ─────────────────────────────────────────
-// isMobile = true for both iOS and Android → show wheel picker
-const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) && !window.MSStream;
+  if (!isMobile) {
+    // Single date picker
+    const singleDate = document.getElementById("singleDate");
+    singleDate.min   = fmt(ranges.single.min);
+    singleDate.max   = fmt(ranges.single.max);
+    singleDate.value = values.single;
+    singleDate.addEventListener("change", () => { values.single = singleDate.value; });
 
-const ua = navigator.userAgent;
-const deviceLabel = /iPad|iPhone|iPod/i.test(ua) ? "iOS — Wheel picker" :
-                    /Android/i.test(ua)           ? "Android — Wheel picker" :
-                                                    "Desktop — Browser picker";
-document.getElementById("deviceBadge").textContent = deviceLabel;
+    // Linked start / end
+    const startDate = document.getElementById("startDate");
+    const endDate   = document.getElementById("endDate");
+    startDate.min   = fmt(ranges.start.min);
+    startDate.max   = fmt(ranges.start.max);
+    startDate.value = values.start;
 
-// ─── Date ranges ──────────────────────────────────────────────
-const today = new Date();
-today.setHours(0, 0, 0, 0);
-
-const ranges = {
-  single: { min: addDays(today, -30), max: addYears(today, 1) },
-  start:  { min: today,               max: addYears(today, 1) },
-  end:    { min: null,                max: null }
-};
-
-// ─── State ────────────────────────────────────────────────────
-const values = { single: fmt(today), start: fmt(today), end: "" };
-
-// ─── Show correct input per device ───────────────────────────
-["single", "start", "end"].forEach(key => {
-  const nativeId  = key === "single" ? "singleDate"   : key + "Date";
-  const displayId = key === "single" ? "singleDisplay": key + "Display";
-  document.getElementById(displayId).style.display = isMobile ? "flex"  : "none";
-  document.getElementById(nativeId).style.display  = isMobile ? "none"  : "block";
-});
-
-// ─── Native input setup (Desktop only) ───────────────────────
-if (!isMobile) {
-  const singleDate = document.getElementById("singleDate");
-  singleDate.min   = fmt(ranges.single.min);
-  singleDate.max   = fmt(ranges.single.max);
-  singleDate.value = values.single;
-  singleDate.addEventListener("change", () => { values.single = singleDate.value; });
-
-  const startDate = document.getElementById("startDate");
-  const endDate   = document.getElementById("endDate");
-  startDate.min   = fmt(ranges.start.min);
-  startDate.max   = fmt(ranges.start.max);
-  startDate.value = values.start;
-
-  function updateEndNative() {
-    const s = startDate.value;
-    if (!s) { endDate.disabled = true; return; }
-    const sel = new Date(s + "T00:00:00");
-    endDate.disabled = false;
-    endDate.min = fmt(addDays(sel, 1));
-    endDate.max = fmt(addDays(sel, 90));
-    if (endDate.value && (endDate.value < endDate.min || endDate.value > endDate.max))
-      endDate.value = "";
-    updateResult();
-  }
-
-  startDate.addEventListener("change", updateEndNative);
-  endDate.addEventListener("change", updateResult);
-  updateEndNative();
-}
-
-// ─── Result panel ─────────────────────────────────────────────
-function updateResult() {
-  const s = values.start, e = values.end;
-  const panel = document.getElementById("result-panel");
-  document.getElementById("r-start").textContent = friendly(s) || "—";
-  document.getElementById("r-end").textContent   = friendly(e) || "—";
-  if (s && e) {
-    const diff = Math.round(
-      (new Date(e + "T00:00:00") - new Date(s + "T00:00:00")) / 86400000
-    );
-    document.getElementById("r-days").textContent = diff + " day" + (diff !== 1 ? "s" : "");
-    panel.classList.add("visible");
-  } else {
-    document.getElementById("r-days").textContent = "—";
-    panel.classList.toggle("visible", !!s);
-  }
-}
-
-// ─── Wheel Picker ─────────────────────────────────────────────
-let activePicker = null;
-let pickerMin, pickerMax;
-
-function buildWheel(innerId, items) {
-  const inner = document.getElementById(innerId);
-  inner.innerHTML = "";
-  items.forEach(text => {
-    const div = document.createElement("div");
-    div.className = "picker-wheel-item";
-    div.textContent = text;
-    inner.appendChild(div);
-  });
-}
-
-function scrollTo(wheelId, index) {
-  const wheel = document.getElementById(wheelId);
-  wheel.scrollTop = index * 36;
-}
-
-function getIndex(wheelId) {
-  return Math.round(document.getElementById(wheelId).scrollTop / 36);
-}
-
-function openPicker(key) {
-  if (key === "end" && !values.start) return;
-
-  activePicker = key;
-  pickerMin = new Date(ranges[key] && ranges[key].min ? ranges[key].min : today);
-  pickerMax = new Date(ranges[key] && ranges[key].max ? ranges[key].max : addYears(today, 1));
-
-  // Dynamic end range based on start value
-  if (key === "end" && values.start) {
-    const s = new Date(values.start + "T00:00:00");
-    pickerMin = addDays(s, 1);
-    pickerMax = addDays(s, 90);
-  }
-
-  const titles = { single: "Select Date", start: "Start Date", end: "End Date" };
-  document.getElementById("pickerTitle").textContent = titles[key];
-
-  // Build wheels
-  buildWheel("wheelDayInner",   Array.from({length: 31}, (_, i) => String(i + 1).padStart(2, "0")));
-  buildWheel("wheelMonthInner", MONTHS);
-
-  const y1 = pickerMin.getFullYear(), y2 = pickerMax.getFullYear();
-  buildWheel("wheelYearInner", Array.from({length: y2 - y1 + 1}, (_, i) => String(y1 + i)));
-
-  // Scroll to current value
-  const current = values[key] ? new Date(values[key] + "T00:00:00") : new Date(pickerMin);
-  setTimeout(() => {
-    scrollTo("wheelDay",   current.getDate() - 1);
-    scrollTo("wheelMonth", current.getMonth());
-    scrollTo("wheelYear",  current.getFullYear() - y1);
-  }, 20);
-
-  document.getElementById("pickerOverlay").classList.add("open");
-  document.body.style.overflow = "hidden";
-}
-
-function getPickedDate() {
-  const y1      = pickerMin.getFullYear();
-  const year    = y1 + getIndex("wheelYear");
-  const month   = getIndex("wheelMonth");
-  const day     = getIndex("wheelDay") + 1;
-  const maxDay  = new Date(year, month + 1, 0).getDate();
-  return new Date(year, month, Math.min(day, maxDay));
-}
-
-function closePicker(confirm) {
-  if (confirm) {
-    let picked = getPickedDate();
-    if (picked < pickerMin) picked = new Date(pickerMin);
-    if (picked > pickerMax) picked = new Date(pickerMax);
-
-    const pickedStr = fmt(picked);
-    values[activePicker] = pickedStr;
-
-    const textIds = { single: "singleDisplayText", start: "startDisplayText", end: "endDisplayText" };
-    const el = document.getElementById(textIds[activePicker]);
-    el.textContent = friendly(pickedStr);
-    el.classList.remove("placeholder");
-
-    if (activePicker === "start") {
-      values.end = "";
-      const endText = document.getElementById("endDisplayText");
-      endText.textContent = "Select";
-      endText.classList.add("placeholder");
-      document.getElementById("endDisplay").classList.remove("disabled");
+    /** Recalculate end date min/max whenever start changes */
+    function updateEndNative() {
+      const s = startDate.value;
+      if (!s) { endDate.disabled = true; return; }
+      const sel = new Date(s + "T00:00:00");
+      endDate.disabled = false;
+      endDate.min = fmt(addDays(sel, 1));   // end must be at least 1 day after start
+      endDate.max = fmt(addDays(sel, 90));  // end can be at most 90 days after start
+      // Clear end if it falls outside the new range
+      if (endDate.value && (endDate.value < endDate.min || endDate.value > endDate.max))
+        endDate.value = "";
+      updateResult();
     }
 
-    updateResult();
+    startDate.addEventListener("change", updateEndNative);
+    endDate.addEventListener("change", updateResult);
+    updateEndNative(); // run once on load to set initial end range
   }
 
-  document.getElementById("pickerOverlay").classList.remove("open");
-  document.body.style.overflow = "";
-  activePicker = null;
-}
+  // ─────────────────────────────────────────────────────────────
+  // RESULT PANEL — updates after both start and end are selected
+  // ─────────────────────────────────────────────────────────────
 
-function handleOverlayClick(e) {
-  if (e.target === document.getElementById("pickerOverlay")) closePicker(false);
-}
+  function updateResult() {
+    const s = values.start, e = values.end;
+    const panel = document.getElementById("result-panel");
+    document.getElementById("r-start").textContent = friendly(s) || "—";
+    document.getElementById("r-end").textContent   = friendly(e) || "—";
 
-// ─── Init mobile displays ─────────────────────────────────────
-if (isMobile) {
-  document.getElementById("singleDisplayText").textContent = friendly(values.single);
-  document.getElementById("singleDisplayText").classList.remove("placeholder");
-  document.getElementById("startDisplayText").textContent  = friendly(values.start);
-  document.getElementById("startDisplayText").classList.remove("placeholder");
-}
+    if (s && e) {
+      // Parse date strings as local dates (not UTC) to get correct diff
+      const [sy, sm, sd] = s.split("-").map(Number);
+      const [ey, em, ed] = e.split("-").map(Number);
+      const diff = Math.round(
+        (new Date(ey, em - 1, ed) - new Date(sy, sm - 1, sd)) / 86400000
+      );
+      document.getElementById("r-days").textContent = diff + " day" + (diff !== 1 ? "s" : "");
+      panel.classList.add("visible");
+    } else {
+      document.getElementById("r-days").textContent = "—";
+      panel.classList.toggle("visible", !!s);
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // WHEEL PICKER — iOS + Android
+  // ─────────────────────────────────────────────────────────────
+
+  let activePicker = null; // which field is currently open: 'single' | 'start' | 'end'
+  let pickerMin, pickerMax; // date range for the currently open picker
+
+  /** Populate a wheel column with an array of string items */
+  function buildWheel(innerId, items) {
+    const inner = document.getElementById(innerId);
+    inner.innerHTML = "";
+    items.forEach(text => {
+      const div = document.createElement("div");
+      div.className = "picker-wheel-item";
+      div.textContent = text;
+      inner.appendChild(div);
+    });
+  }
+
+  /** Scroll a wheel to a specific item index (each item is 36px tall) */
+  function scrollTo(wheelId, index) {
+    document.getElementById(wheelId).scrollTop = index * 36;
+  }
+
+  /** Get the currently centred item index from scroll position */
+  function getIndex(wheelId) {
+    return Math.round(document.getElementById(wheelId).scrollTop / 36);
+  }
+
+  /**
+   * Rebuild the day wheel based on the currently selected month and year.
+   * This fixes the bug where months with <31 days (e.g. April, February)
+   * would still show 31 days. Called whenever month or year wheel is scrolled.
+   */
+  function rebuildDayWheel() {
+    const y1          = pickerMin.getFullYear();
+    const year        = y1 + getIndex("wheelYear");
+    const month       = getIndex("wheelMonth"); // 0-based
+    const daysInMonth = new Date(year, month + 1, 0).getDate(); // last day of month
+    const currentDay  = getIndex("wheelDay") + 1;
+
+    buildWheel("wheelDayInner",
+      Array.from({length: daysInMonth}, (_, i) => String(i + 1).padStart(2, "0"))
+    );
+
+    // Clamp selected day if it exceeds new month's max (e.g. was 31st, now April → 30th)
+    const clampedDay = Math.min(currentDay, daysInMonth);
+    scrollTo("wheelDay", clampedDay - 1);
+  }
+
+  // Debounced version — only fires 120ms after scrolling stops
+  const debouncedRebuild = debounce(rebuildDayWheel, 120);
+
+  /** Open the wheel picker for a given field key */
+  function openPicker(key) {
+    // Don't open end picker if start hasn't been chosen yet
+    if (key === "end" && !values.start) return;
+
+    activePicker = key;
+
+    // Set min/max for this picker
+    pickerMin = new Date(ranges[key] && ranges[key].min ? ranges[key].min : today);
+    pickerMax = new Date(ranges[key] && ranges[key].max ? ranges[key].max : addYears(today, 1));
+
+    // For end date, compute min/max dynamically from the chosen start date
+    if (key === "end" && values.start) {
+      const [sy, sm, sd] = values.start.split("-").map(Number);
+      const s = new Date(sy, sm - 1, sd);
+      pickerMin = addDays(s, 1);   // at least 1 day after start
+      pickerMax = addDays(s, 90);  // at most 90 days after start
+    }
+
+    // Set the sheet title
+    const titles = { single: "Select Date", start: "Start Date", end: "End Date" };
+    document.getElementById("pickerTitle").textContent = titles[key];
+
+    // Build month and year wheels
+    buildWheel("wheelMonthInner", MONTHS);
+    const y1 = pickerMin.getFullYear(), y2 = pickerMax.getFullYear();
+    buildWheel("wheelYearInner",
+      Array.from({length: y2 - y1 + 1}, (_, i) => String(y1 + i))
+    );
+
+    // Determine initial date to scroll to (current value or pickerMin)
+    const cur = values[key]
+      ? (() => { const [y, m, d] = values[key].split("-").map(Number); return new Date(y, m - 1, d); })()
+      : new Date(pickerMin);
+
+    setTimeout(() => {
+      // Scroll month and year first, THEN build the day wheel for that month/year.
+      // Order matters: day wheel must know the correct month before building.
+      scrollTo("wheelMonth", cur.getMonth());
+      scrollTo("wheelYear",  cur.getFullYear() - y1);
+
+      // Build day wheel with correct number of days for this month/year
+      const daysInMonth = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate();
+      buildWheel("wheelDayInner",
+        Array.from({length: daysInMonth}, (_, i) => String(i + 1).padStart(2, "0"))
+      );
+      scrollTo("wheelDay", cur.getDate() - 1);
+
+      // Attach scroll listeners so day wheel updates when month/year changes
+      document.getElementById("wheelMonth").onscroll = debouncedRebuild;
+      document.getElementById("wheelYear").onscroll  = debouncedRebuild;
+    }, 20);
+
+    document.getElementById("pickerOverlay").classList.add("open");
+    document.body.style.overflow = "hidden"; // prevent background scroll while picker is open
+  }
+
+  /** Read the currently centred items across all three wheels and return a Date */
+  function getPickedDate() {
+    const y1          = pickerMin.getFullYear();
+    const year        = y1 + getIndex("wheelYear");
+    const month       = getIndex("wheelMonth"); // 0-based
+    const day         = getIndex("wheelDay") + 1;
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    // Clamp day in case month was changed after day was set
+    return new Date(year, month, Math.min(day, daysInMonth));
+  }
+
+  /** Close the picker. If confirm=true, save the picked date. */
+  function closePicker(confirm) {
+    if (confirm) {
+      let picked = getPickedDate();
+
+      // Clamp to allowed min/max range
+      if (picked < pickerMin) picked = new Date(pickerMin);
+      if (picked > pickerMax) picked = new Date(pickerMax);
+
+      const pickedStr = fmt(picked);
+      values[activePicker] = pickedStr;
+
+      // Update the display div text
+      const textIds = {
+        single: "singleDisplayText",
+        start:  "startDisplayText",
+        end:    "endDisplayText"
+      };
+      const el = document.getElementById(textIds[activePicker]);
+      el.textContent = friendly(pickedStr);
+      el.classList.remove("placeholder");
+
+      // If start date changed: reset end date and re-enable end picker
+      if (activePicker === "start") {
+        values.end = "";
+        const endText = document.getElementById("endDisplayText");
+        endText.textContent = "Select";
+        endText.classList.add("placeholder");
+        document.getElementById("endDisplay").classList.remove("disabled");
+      }
+
+      updateResult();
+    }
+
+    // Remove scroll listeners to avoid stale callbacks on next open
+    document.getElementById("wheelMonth").onscroll = null;
+    document.getElementById("wheelYear").onscroll  = null;
+
+    document.getElementById("pickerOverlay").classList.remove("open");
+    document.body.style.overflow = ""; // restore background scroll
+    activePicker = null;
+  }
+
+  /** Close picker without saving if user taps the dark overlay behind the sheet */
+  function handleOverlayClick(e) {
+    if (e.target === document.getElementById("pickerOverlay")) closePicker(false);
+  }
+
+  // ─────────────────────────────────────────────────────────────
+  // INIT — pre-fill mobile display labels with today's date
+  // ─────────────────────────────────────────────────────────────
+
+  if (isMobile) {
+    document.getElementById("singleDisplayText").textContent = friendly(values.single);
+    document.getElementById("singleDisplayText").classList.remove("placeholder");
+    document.getElementById("startDisplayText").textContent  = friendly(values.start);
+    document.getElementById("startDisplayText").classList.remove("placeholder");
+  }
 </script>
 </body>
 </html>
