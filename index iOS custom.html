@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Date Picker Demo</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f5;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+      padding: 2rem;
+      width: 100%;
+      max-width: 480px;
+    }
+
+    h1 { font-size: 1.25rem; font-weight: 600; color: #111; margin-bottom: 0.25rem; }
+    .subtitle { font-size: 0.875rem; color: #666; margin-bottom: 1.75rem; }
+
+    .field { margin-bottom: 1.25rem; }
+
+    label {
+      display: block;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: #444;
+      margin-bottom: 0.375rem;
+    }
+
+    /* Shown on Android + Desktop */
+    input[type="date"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      color: #111;
+      background: #fff;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+
+    input[type="date"]:focus {
+      border-color: #6366f1;
+      box-shadow: 0 0 0 3px rgba(99,102,241,0.15);
+    }
+
+    input[type="date"]:disabled {
+      background: #f9fafb;
+      color: #aaa;
+      cursor: not-allowed;
+    }
+
+    /* Fake input shown on iOS */
+    .ios-date-display {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      font-size: 1rem;
+      color: #111;
+      background: #fff;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: border-color 0.15s;
+      user-select: none;
+    }
+
+    .ios-date-display.disabled {
+      background: #f9fafb;
+      color: #aaa;
+      cursor: not-allowed;
+      pointer-events: none;
+    }
+
+    .ios-date-display:active { border-color: #6366f1; }
+    .ios-date-display .placeholder { color: #9ca3af; }
+    .ios-date-display .arrow { color: #9ca3af; font-size: 0.75rem; }
+
+    .hint { font-size: 0.75rem; color: #888; margin-top: 0.3rem; }
+    .divider { border: none; border-top: 1px solid #f0f0f0; margin: 1.5rem 0; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      background: #ede9fe;
+      color: #5b21b6;
+      border-radius: 999px;
+      padding: 2px 8px;
+      margin-left: 6px;
+      font-weight: 500;
+    }
+
+    .range-row { display: flex; gap: 0.75rem; }
+    .range-row .field { flex: 1; }
+
+    #result-panel {
+      margin-top: 1.25rem;
+      padding: 0.75rem 1rem;
+      background: #f9fafb;
+      border-radius: 8px;
+      font-size: 0.8125rem;
+      color: #555;
+      display: none;
+    }
+    #result-panel.visible { display: block; }
+    #result-panel .row { display: flex; justify-content: space-between; padding: 3px 0; }
+    #result-panel .row span:last-child { font-weight: 500; color: #111; }
+
+    .device-badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      background: #d1fae5;
+      color: #065f46;
+      border-radius: 999px;
+      padding: 2px 10px;
+      font-weight: 500;
+      margin-bottom: 1rem;
+    }
+
+    /* ===================== iOS WHEEL PICKER ===================== */
+    .ios-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.35);
+      z-index: 1000;
+      align-items: flex-end;
+    }
+    .ios-overlay.open { display: flex; }
+
+    .ios-sheet {
+      width: 100%;
+      background: #f2f2f7;
+      border-radius: 16px 16px 0 0;
+      overflow: hidden;
+      animation: slideUp 0.28s cubic-bezier(0.32, 0.72, 0, 1);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(100%); }
+      to   { transform: translateY(0); }
+    }
+
+    .ios-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.75rem 1rem;
+      background: #f2f2f7;
+      border-bottom: 1px solid #c8c8cc;
+    }
+
+    .ios-toolbar button {
+      background: none;
+      border: none;
+      font-size: 1rem;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 6px;
+    }
+
+    .ios-btn-cancel { color: #888; }
+    .ios-btn-done   { color: #007aff; font-weight: 600; }
+    .ios-toolbar-title { font-size: 0.9375rem; font-weight: 600; color: #111; }
+
+    .ios-wheels {
+      display: flex;
+      height: 216px;
+      overflow: hidden;
+      background: #f2f2f7;
+      position: relative;
+    }
+
+    /* Highlight bar */
+    .ios-wheels::before,
+    .ios-wheels::after {
+      content: '';
+      position: absolute;
+      left: 0; right: 0;
+      height: 1px;
+      background: #c8c8cc;
+      z-index: 2;
+      pointer-events: none;
+    }
+    .ios-wheels::before { top: calc(50% - 18px); }
+    .ios-wheels::after  { top: calc(50% + 18px); }
+
+    .ios-wheel {
+      flex: 1;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+      position: relative;
+    }
+    .ios-wheel::-webkit-scrollbar { display: none; }
+
+    .ios-wheel-inner {
+      padding: 80px 0; /* top+bottom padding = (216 - 36) / 2 */
+    }
+
+    .ios-wheel-item {
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      scroll-snap-align: center;
+      font-size: 1.125rem;
+      color: #111;
+      cursor: pointer;
+      transition: color 0.1s;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Date Picker Demo</h1>
+  <p class="subtitle">Adapts to your device automatically.</p>
+  <div class="device-badge" id="deviceBadge">Detecting device...</div>
+
+  <!-- SINGLE DATE -->
+  <div class="field">
+    <label>Pick a date <span class="badge">dynamic range</span></label>
+
+    <!-- Android / Desktop -->
+    <input type="date" id="singleDate" style="display:none" />
+
+    <!-- iOS -->
+    <div class="ios-date-display" id="singleDisplay" style="display:none"
+         onclick="openPicker('single')">
+      <span id="singleDisplayText" class="placeholder">Select date</span>
+      <span class="arrow">▼</span>
+    </div>
+
+    <p class="hint">Allowed: last 30 days → 1 year from today</p>
+  </div>
+
+  <hr class="divider" />
+
+  <p style="font-size:0.8125rem;font-weight:500;color:#444;margin-bottom:0.75rem;">
+    Start &amp; End range <span class="badge">linked</span>
+  </p>
+
+  <div class="range-row">
+    <div class="field">
+      <label>Start date</label>
+      <input type="date" id="startDate" style="display:none" />
+      <div class="ios-date-display" id="startDisplay" style="display:none"
+           onclick="openPicker('start')">
+        <span id="startDisplayText" class="placeholder">Select</span>
+        <span class="arrow">▼</span>
+      </div>
+      <p class="hint">Today → 1 year ahead</p>
+    </div>
+    <div class="field">
+      <label>End date</label>
+      <input type="date" id="endDate" disabled style="display:none" />
+      <div class="ios-date-display disabled" id="endDisplay" style="display:none"
+           onclick="openPicker('end')">
+        <span id="endDisplayText" class="placeholder">Select</span>
+        <span class="arrow">▼</span>
+      </div>
+      <p class="hint">1–90 days after start</p>
+    </div>
+  </div>
+
+  <div id="result-panel">
+    <div class="row"><span>Start</span><span id="r-start">—</span></div>
+    <div class="row"><span>End</span><span id="r-end">—</span></div>
+    <div class="row"><span>Duration</span><span id="r-days">—</span></div>
+  </div>
+</div>
+
+<!-- iOS Wheel Picker Sheet -->
+<div class="ios-overlay" id="iosOverlay" onclick="handleOverlayClick(event)">
+  <div class="ios-sheet">
+    <div class="ios-toolbar">
+      <button class="ios-btn-cancel" onclick="closePicker(false)">Cancel</button>
+      <span class="ios-toolbar-title" id="iosTitle">Select Date</span>
+      <button class="ios-btn-done" onclick="closePicker(true)">Done</button>
+    </div>
+    <div class="ios-wheels">
+      <div class="ios-wheel" id="wheelDay">
+        <div class="ios-wheel-inner" id="wheelDayInner"></div>
+      </div>
+      <div class="ios-wheel" id="wheelMonth">
+        <div class="ios-wheel-inner" id="wheelMonthInner"></div>
+      </div>
+      <div class="ios-wheel" id="wheelYear">
+        <div class="ios-wheel-inner" id="wheelYearInner"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Utilities ────────────────────────────────────────────────
+function fmt(d)       { return d.toISOString().split("T")[0]; }
+function addDays(d,n) { const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function addYears(d,n){ const r=new Date(d); r.setFullYear(r.getFullYear()+n); return r; }
+
+function friendly(str) {
+  if (!str) return null;
+  return new Date(str + "T00:00:00").toLocaleDateString(undefined, {
+    day: "numeric", month: "short", year: "numeric"
+  });
+}
+
+const MONTHS = ["January","February","March","April","May","June",
+                "July","August","September","October","November","December"];
+
+// ─── Device Detection ─────────────────────────────────────────
+const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+const badge = document.getElementById("deviceBadge");
+badge.textContent = isIOS ? "iOS — Wheel picker" :
+  (/android/i.test(navigator.userAgent) ? "Android — Native calendar" : "Desktop — Browser picker");
+
+// ─── Date ranges ──────────────────────────────────────────────
+const today = new Date();
+today.setHours(0,0,0,0);
+
+const ranges = {
+  single: { min: addDays(today,-30), max: addYears(today,1) },
+  start:  { min: today,              max: addYears(today,1) },
+  end:    { min: null,               max: null }  // set dynamically
+};
+
+// ─── State ────────────────────────────────────────────────────
+const values = { single: fmt(today), start: fmt(today), end: "" };
+
+// ─── Show correct input type ──────────────────────────────────
+["single","start","end"].forEach(key => {
+  const native  = document.getElementById(key === "single" ? "singleDate" : key + "Date");
+  const display = document.getElementById(key === "single" ? "singleDisplay" : key + "Display");
+  if (isIOS) {
+    display.style.display = "flex";
+  } else {
+    native.style.display = "block";
+  }
+});
+
+// ─── Native input setup (Android / Desktop) ───────────────────
+if (!isIOS) {
+  const singleDate = document.getElementById("singleDate");
+  singleDate.min   = fmt(ranges.single.min);
+  singleDate.max   = fmt(ranges.single.max);
+  singleDate.value = values.single;
+  singleDate.addEventListener("change", () => { values.single = singleDate.value; });
+
+  const startDate = document.getElementById("startDate");
+  startDate.min   = fmt(ranges.start.min);
+  startDate.max   = fmt(ranges.start.max);
+  startDate.value = values.start;
+
+  const endDate = document.getElementById("endDate");
+
+  function updateEndNative() {
+    const s = startDate.value;
+    if (!s) { endDate.disabled = true; return; }
+    const sel = new Date(s + "T00:00:00");
+    endDate.disabled = false;
+    endDate.min = fmt(addDays(sel, 1));
+    endDate.max = fmt(addDays(sel, 90));
+    if (endDate.value && (endDate.value < endDate.min || endDate.value > endDate.max))
+      endDate.value = "";
+    updateResult();
+  }
+
+  startDate.addEventListener("change", updateEndNative);
+  endDate.addEventListener("change", updateResult);
+  updateEndNative();
+}
+
+// ─── Result panel ─────────────────────────────────────────────
+function updateResult() {
+  const s = values.start, e = values.end;
+  const panel = document.getElementById("result-panel");
+  document.getElementById("r-start").textContent = friendly(s) || "—";
+  document.getElementById("r-end").textContent   = friendly(e) || "—";
+  if (s && e) {
+    const diff = Math.round(
+      (new Date(e+"T00:00:00") - new Date(s+"T00:00:00")) / 86400000
+    );
+    document.getElementById("r-days").textContent = diff + " day" + (diff!==1?"s":"");
+    panel.classList.add("visible");
+  } else {
+    document.getElementById("r-days").textContent = "—";
+    panel.classList.toggle("visible", !!s);
+  }
+}
+
+// ─── iOS Wheel Picker ─────────────────────────────────────────
+let activePicker = null;
+let pickerMin, pickerMax;
+
+function buildWheel(containerId, items) {
+  const inner = document.getElementById(containerId);
+  inner.innerHTML = "";
+  items.forEach(item => {
+    const div = document.createElement("div");
+    div.className = "ios-wheel-item";
+    div.textContent = item;
+    inner.appendChild(div);
+  });
+}
+
+function scrollWheelTo(wheelId, index) {
+  const wheel = document.getElementById(wheelId);
+  // each item 36px, scroll so item is centred
+  wheel.scrollTop = index * 36;
+}
+
+function getWheelIndex(wheelId) {
+  const wheel = document.getElementById(wheelId);
+  return Math.round(wheel.scrollTop / 36);
+}
+
+function openPicker(key) {
+  if (key === "end" && !values.start) return;
+
+  activePicker = key;
+  pickerMin = ranges[key].min;
+  pickerMax = ranges[key].max;
+
+  // Update end range dynamically
+  if (key === "end" && values.start) {
+    const s = new Date(values.start + "T00:00:00");
+    pickerMin = addDays(s, 1);
+    pickerMax = addDays(s, 90);
+  }
+
+  const titles = { single: "Select Date", start: "Start Date", end: "End Date" };
+  document.getElementById("iosTitle").textContent = titles[key];
+
+  // Build day wheel 1–31
+  const days   = Array.from({length:31}, (_,i) => String(i+1).padStart(2,"0"));
+  buildWheel("wheelDayInner", days);
+
+  // Build month wheel
+  buildWheel("wheelMonthInner", MONTHS);
+
+  // Build year wheel (min.year → max.year)
+  const y1 = pickerMin.getFullYear(), y2 = pickerMax.getFullYear();
+  const years = Array.from({length: y2-y1+1}, (_,i) => String(y1+i));
+  buildWheel("wheelYearInner", years);
+
+  // Set initial scroll position from current value
+  const current = values[key] ? new Date(values[key]+"T00:00:00") : new Date(pickerMin);
+  setTimeout(() => {
+    scrollWheelTo("wheelDay",   current.getDate() - 1);
+    scrollWheelTo("wheelMonth", current.getMonth());
+    scrollWheelTo("wheelYear",  current.getFullYear() - y1);
+  }, 10);
+
+  document.getElementById("iosOverlay").classList.add("open");
+  document.body.style.overflow = "hidden";
+}
+
+function getPickerDate() {
+  const dayIdx   = getWheelIndex("wheelDay");
+  const monthIdx = getWheelIndex("wheelMonth");
+  const yearIdx  = getWheelIndex("wheelYear");
+
+  const y1 = pickerMin.getFullYear();
+  const year  = y1 + yearIdx;
+  const month = monthIdx;       // 0-based
+  const day   = dayIdx + 1;
+
+  // Clamp day to valid range for that month/year
+  const maxDay = new Date(year, month+1, 0).getDate();
+  const safeDay = Math.min(day, maxDay);
+
+  return new Date(year, month, safeDay);
+}
+
+function closePicker(confirm) {
+  if (confirm) {
+    let picked = getPickerDate();
+
+    // Clamp to min/max
+    if (picked < pickerMin) picked = new Date(pickerMin);
+    if (picked > pickerMax) picked = new Date(pickerMax);
+
+    const pickedStr = fmt(picked);
+    values[activePicker] = pickedStr;
+
+    // Update display
+    const displayMap = { single: "singleDisplayText", start: "startDisplayText", end: "endDisplayText" };
+    const el = document.getElementById(displayMap[activePicker]);
+    el.textContent = friendly(pickedStr);
+    el.classList.remove("placeholder");
+
+    // If start changed, reset end and enable it
+    if (activePicker === "start") {
+      values.end = "";
+      document.getElementById("endDisplayText").textContent = "Select";
+      document.getElementById("endDisplayText").classList.add("placeholder");
+      const endDisplay = document.getElementById("endDisplay");
+      endDisplay.classList.remove("disabled");
+    }
+
+    updateResult();
+  }
+
+  document.getElementById("iosOverlay").classList.remove("open");
+  document.body.style.overflow = "";
+  activePicker = null;
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById("iosOverlay")) closePicker(false);
+}
+
+// Init iOS displays
+if (isIOS) {
+  document.getElementById("singleDisplayText").textContent = friendly(values.single);
+  document.getElementById("singleDisplayText").classList.remove("placeholder");
+  document.getElementById("startDisplayText").textContent  = friendly(values.start);
+  document.getElementById("startDisplayText").classList.remove("placeholder");
+}
+</script>
+</body>
+</html>
