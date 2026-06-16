@@ -232,7 +232,7 @@
     .picker-wheel::-webkit-scrollbar { display: none; }
 
     /* Top & bottom padding makes first/last items centerable */
-    .picker-wheel-inner { padding: 80px 0; }
+    .picker-wheel-inner { padding: 90px 0; }
 
     .picker-wheel-item {
       height: 36px;
@@ -563,7 +563,7 @@
 
   /** Get the currently centred item index from scroll position */
   function getIndex(wheelId) {
-    return Math.round(document.getElementById(wheelId).scrollTop / 36);
+    return return Math.floor((document.getElementById(wheelId).scrollTop + 18) / 36);
   }
 
   /**
